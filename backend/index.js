@@ -8,6 +8,7 @@ dotenv.config();
 
 // Import routes
 const authRoutes = require('./auth/routes/authRoutes');
+const bookwareRoutes = require('./ware/routes/bookwareRoutes.js')
 
 // Create Express app
 const app = express();
