@@ -3,15 +3,49 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>테이블 예약화면</title>
+    <title><%= tableId %>번 테이블 예약 현황</title>
+    <style>
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        th, td {
+            border: 1px solid black;
+            padding: 8px;
+            text-align: center;
+        }
+        .reserved { background-color: red; color: white; }
+        .available { background-color: green; color: white; }
+    </style>
 </head>
-<body class="grey-bg">
+<body>
 
+    <h2><%= tableId %>번 테이블 예약 현황</h2>
+    <table>
+        <tr>
+            <th>시간</th>
+            <th>월</th>
+            <th>화</th>
+            <th>수</th>
+            <th>목</th>
+            <th>금</th>
+            <th>토</th>
+            <th>일</th>
+        </tr>
+        <% const times = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10","11", "12", "13", "14", "15", "16", "17", "18", "19", "20"]; %>
+        <% times.forEach(time => { %>
+        <tr>
+            <td><%= time %></td>
+            <% ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"].forEach(day => { %>
+                <% if (schedule[day] && schedule[day][time] === "F") { %>
+                    <td class="reserved">예약됨</td>
+                <% } else { %>
+                    <td class="available">예약 가능</td>
+                <% } %>
+            <% }); %>
+        </tr>
+        <% }); %>
+    </table>
 
-    <div class="detail-bg">
-        <h4>테이블 예약 시간표</h4>
-        <p></p>
-    </div> 
-    
-  </body>
+</body>
 </html>
