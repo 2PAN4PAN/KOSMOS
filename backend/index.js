@@ -7,8 +7,6 @@ const dotenv = require('dotenv');
 dotenv.config();
 
 // Import routes
-const authRoutes = require('./auth/routes/authRoutes');
-const bookwareRoutes = require('./ware/routes/bookwareRoutes.js')
 
 // Create Express app
 const app = express();
@@ -21,12 +19,16 @@ app.use(express.urlencoded({ extended: true })); // Parse URL-encoded request bo
 // MongoDB Connection
 const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/dongbang_reservation';
 
-mongoose.connect(MONGODB_URI)
+mongoose.connect(MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+  useCreateIndex: true,
+  useFindAndModify: false
+})
 .then(() => console.log('MongoDB connected successfully'))
 .catch((err) => console.error('MongoDB connection error:', err));
 
 // Routes
-app.use('/api/auth', authRoutes);
 
 // Basic error handling middleware
 app.use((err, req, res, next) => {
