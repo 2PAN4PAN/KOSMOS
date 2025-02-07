@@ -8,7 +8,7 @@ dotenv.config();
 
 // Import routes
 const authRoutes = require('./auth/routes/authRoutes');
-const bookwareRoutes = require('./ware/routes/bookwareRoutes.js')
+const bookwareRoutes = require('./ware/routes/bookRoutes.js')
 
 // Create Express app
 const app = express();
@@ -27,6 +27,7 @@ mongoose.connect(MONGODB_URI)
 
 // Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/ware', bookwareRoutes);
 
 // Basic error handling middleware
 app.use((err, req, res, next) => {

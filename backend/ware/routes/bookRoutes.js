@@ -2,7 +2,7 @@
 const express = require('express');
 const router = express.Router();
 const Ware = require('../models/Ware');
-const User = require('../models/User'); // User 모델 추가
+const User = require('../../auth/models/User'); // User 모델 추가
 
 // 물품 대여 페이지 (렌더링 가정)
 router.get('/ware', (req, res) => {
@@ -46,7 +46,7 @@ router.post('/borrow', async (req, res) => {
         const { wareName, userId, returnDate } = req.body; // 요청에서 물품 이름, 사용자 ID 받기
 
         // 사용자 ID 유효성 검사 (User 모델을 사용하여 확인)
-        const user = await User.findById(userId);
+        const user = await User.findOne({ studentId: userId });
         if (!user) {
             return res.status(400).json({ message: '유효하지 않은 사용자 ID입니다.' });
         }
@@ -66,7 +66,7 @@ router.post('/borrow', async (req, res) => {
         // 대여 처리
         ware.isAvailable = false;
         ware.quantity -= 1;
-        ware.borrower = userId;  // 사용자 ID 저장
+        ware.borrower = user._id;  // 사용자 ID 저장
         ware.borrowedDate = new Date();
         ware.returnDate = returnDate; // 반납일 설정
         await ware.save();
