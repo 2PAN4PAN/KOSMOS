@@ -112,4 +112,28 @@ router.post('/mod', authMiddleware, async (req, res) => {
   }
 });
 
+// User Information Retrieval Route
+router.post('/', authMiddleware, async (req, res) => {
+  try {
+    // User is already authenticated by authMiddleware
+    // We can safely return user information
+    const userInfo = {
+      studentId: req.user.studentId,
+      name: req.user.name,
+      isAdmin: req.user.isAdmin,
+      lastLoginAt: req.user.lastLoginAt
+    };
+
+    res.json({
+      success: true,
+      user: userInfo
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: '사용자 정보 조회 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
 module.exports = router;
