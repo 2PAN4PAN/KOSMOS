@@ -138,25 +138,6 @@ router.get('/quantities', async (req, res) => {
     }
 });
 
-// routes/bookRoutes.js
-
-// 활성/연체 대여 로그 조회
-router.get('/active-overdue-logs', async (req, res) => {
-    try {
-        const logs = await Log.find({ status: { $in: ['ACTIVE', 'OVERDUE'] } })
-            .populate('user', 'username email') // user 정보 중 username, email만 가져옴
-            .populate({
-                path: 'item',
-                model: 'Ware' // or 'Desk' depending on the itemModel
-            });
-
-        res.json(logs);
-    } catch (err) {
-        console.error(err);
-        res.status(500).json({ message: '서버 오류' });
-    }
-});
-
 
 // routes/bookRoutes.js
 
@@ -204,6 +185,29 @@ router.get('/dashboard/:wareName', [authMiddleware, adminMiddleware], async (req
     }
 });
 
+// routes/bookRoutes.js
+
+// 사용자가 대여한 물품 목록 조회
+router.get('/borrowed', authMiddleware, async (req, res) => {
+    try {
+      //const userId = req.user._id; // authMiddleware를 통해 사용자 ID를 얻음
+  
+      // Log 모델에서 사용자 ID와 상태(ACTIVE, OVERDUE)를 기준으로 대여 로그 검색
+      const borrowedItems = await Log.find({
+        user: req.user._id,
+        status: { $in: ['ACTIVE', 'OVERDUE'] }
+      })
+        .populate({
+          path: 'item',
+          model: 'Ware' // 'Ware' 또는 'Desk' 모델을 동적으로 지정
+        }); // 대여 물품 정보 연결
+  
+      res.json(borrowedItems);
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ message: '서버 오류' });
+    }
+  });
 
 module.exports = router;
 
