@@ -1,0 +1,79 @@
+.container {
+    padding: 20px;
+    text-align: left; /* 왼쪽 정렬로 변경 */
+    background-color: #f4f4f4;
+    min-height: 100vh;
+  }
+  
+  .header {
+    background-color: #000; /* 상단 배경을 검정색으로 설정 */
+    padding: 20px;
+    text-align: left;
+  }
+  
+  .title {
+    font-size: 24px;
+    font-weight: bold;
+    color: white; /* 텍스트 색을 흰색으로 설정 */
+    margin-bottom: 20px;
+  }
+  
+  .subtitle {
+    font-size: 16px;
+    color: #555;
+    margin-bottom: 20px;
+    text-align: left; /* 예약 안내 문구 왼쪽 정렬 */
+  }
+  
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-start; /* 왼쪽 정렬 */
+    gap: 20px;
+  }
+  
+  .card {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 300px;
+  }
+  
+  .seat-name {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 10px;
+  }
+  
+  .time-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .reservation-button {
+    padding: 8px 12px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.3s ease-in-out;
+  }
+  
+  .available {
+    background-color: #10b981;
+    color: white;
+  }
+  
+  .available:hover {
+    background-color: #059669;
+  }
+  
+  .reserved {
+    background-color: #ef4444;
+    color: white;
+  }
+  
+  .reserved:hover {
+    background-color: #dc2626;
