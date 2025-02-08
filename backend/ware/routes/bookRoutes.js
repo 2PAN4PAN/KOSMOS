@@ -116,4 +116,94 @@ router.post('/return', authMiddleware, async (req, res) => {
     }
 });
 
+// routes/bookRoutes.js
+
+// 물품 별 수량 조회
+router.get('/quantities', async (req, res) => {
+    try {
+        const wares = await Ware.find({}); // 모든 물품 조회
+
+        // 물품 이름과 수량을 담을 객체
+        const quantities = {};
+
+        // 물품 목록을 순회하며 수량 계산
+        wares.forEach(ware => {
+            quantities[ware.name] = ware.quantity;
+        });
+
+        res.json(quantities);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: '서버 오류' });
+    }
+});
+
+// routes/bookRoutes.js
+
+// 활성/연체 대여 로그 조회
+router.get('/active-overdue-logs', async (req, res) => {
+    try {
+        const logs = await Log.find({ status: { $in: ['ACTIVE', 'OVERDUE'] } })
+            .populate('user', 'username email') // user 정보 중 username, email만 가져옴
+            .populate({
+                path: 'item',
+                model: 'Ware' // or 'Desk' depending on the itemModel
+            });
+
+        res.json(logs);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: '서버 오류' });
+    }
+});
+
+
+// routes/bookRoutes.js
+
+// 관리자 대시보드용 물품 정보 조회
+router.get('/dashboard/:wareName', [authMiddleware, adminMiddleware], async (req, res) => {
+    try {
+        const { wareName } = req.params;
+
+        // 물품 정보 조회
+        const ware = await Ware.findOne({ name: wareName });
+        if (!ware) {
+            return res.status(404).json({ message: '해당 이름의 물품을 찾을 수 없습니다.' });
+        }
+
+        // 현재 대여 중인 수량 계산
+        const borrowedCount = await Log.countDocuments({
+            item: ware._id,
+            itemModel: 'Ware',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        });
+
+        // 남은 수량 계산
+        const remainingQuantity = ware.quantity - borrowedCount;
+
+        // 반납 예정일 조회 (최근 5개)
+        const upcomingReturns = await Log.find({
+            item: ware._id,
+            itemModel: 'Ware',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        })
+            .sort({ expectedReturnDate: 1 }) // 반납 예정일 오름차순 정렬
+            .limit(5) // 최근 5개만
+            .select('expectedReturnDate'); // expectedReturnDate만 선택
+
+        res.json({
+            name: ware.name,
+            totalQuantity: ware.quantity,
+            borrowedCount: borrowedCount,
+            remainingQuantity: remainingQuantity,
+            upcomingReturns: upcomingReturns
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: '서버 오류' });
+    }
+});
+
+
 module.exports = router;
+
