@@ -128,7 +128,7 @@ router.post('/add', authMiddleware, async (req, res) => {
     expectedReturnDate.setHours(parseInt(lastTimeSlot), 0, 0, 0);
 
     new Log({
-        user: req.user.studentId,
+        user: req.user._id,
         item: parseInt(tableId),
         itemModel: "Desk",
         rentalDate: rentalDate,
