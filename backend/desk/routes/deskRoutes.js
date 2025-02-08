@@ -173,4 +173,52 @@ router.post('/cancel', authMiddleware, async (req, res) => {
     })
 });
 
+// 특정 테이블 예약 현황 조회 라우트
+router.get('/:id', async (req, res) => {
+    try {
+        const tableId = parseInt(req.params.id);
+        const currentWeekRange = getCurrentWeekRange();
+
+        // 현재 주의 특정 테이블 예약 정보 조회
+        const tableReservation = await Desk.findOne({ 
+            tableId: tableId, 
+            week: currentWeekRange 
+        });
+
+        if (!tableReservation) {
+            return res.status(404).json({
+                success: false,
+                message: '해당 테이블의 예약 정보를 찾을 수 없습니다.'
+            });
+        }
+
+        // 예약 현황 가공
+        const reservationStatus = {};
+        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+        const timeSlots = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10","11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
+
+        days.forEach(day => {
+            reservationStatus[day] = {};
+            timeSlots.forEach(time => {
+                const slotStatus = tableReservation.schedule[day][time].type;
+                reservationStatus[day][time] = slotStatus === 'F' ? '예약됨' : '사용 가능';
+            });
+        });
+
+        res.json({
+            success: true,
+            tableId: tableId,
+            week: tableReservation.week,
+            reservationStatus: reservationStatus
+        });
+    } catch (error) {
+        console.error('테이블 예약 현황 조회 중 오류:', error);
+        res.status(500).json({
+            success: false,
+            message: '서버 오류가 발생했습니다.',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;
