@@ -10,13 +10,13 @@ const LogSchema = new mongoose.Schema({
   // Details of the rented item
   item: {
     type: mongoose.Schema.Types.ObjectId,
-    refPath: 'itemModel', // Dynamic reference to different item types
+    refPath: 'Ware', // Dynamic reference to different item types
     required: true
   },
   itemModel: {
     type: String,
     required: true,
-    enum: ['Desk', 'Equipment', 'Room'] // Add more item types as needed
+    enum: ['Desk', 'Ware'] // Add more item types as needed
   },
   
   // Rental details
@@ -40,18 +40,6 @@ const LogSchema = new mongoose.Schema({
     enum: ['ACTIVE', 'RETURNED', 'OVERDUE'],
     default: 'ACTIVE'
   },
-  
-  // Additional metadata
-  notes: {
-    type: String,
-    default: ''
-  },
-  
-  // Penalties or additional charges
-  penalty: {
-    type: Number,
-    default: 0
-  }
 }, {
   timestamps: true, // Adds createdAt and updatedAt fields
   toJSON: { virtuals: true },
@@ -72,8 +60,8 @@ LogSchema.methods.markAsReturned = async function() {
   // Calculate penalty if applicable
   if (this.isOverdue) {
     // Example penalty calculation (customize as needed)
-    const overduedays = Math.ceil((new Date() - this.expectedReturnDate) / (1000 * 60 * 60 * 24));
-    this.penalty = overduedays * 1000; // 1000 won per overdue day
+    // const overduedays = Math.ceil((new Date() - this.expectedReturnDate) / (1000 * 60 * 60 * 24));
+    // this.penalty = overduedays * 1000; // 1000 won per overdue day
   }
   
   return this.save();
