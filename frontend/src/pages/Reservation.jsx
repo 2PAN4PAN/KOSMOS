@@ -40,6 +40,7 @@ export default function Reservation() {
   useEffect(() => {
     const fetchReservationStatus = async (seatId) => {
       try {
+        const token = localStorage.getItem("token");
         const response = await axios.get(`http://localhost:5000/api/desk/${seatId}`);
         if (response.data.success) {
           const status = response.data.reservationStatus;
@@ -106,9 +107,12 @@ export default function Reservation() {
     const reservationsToAdd = [`${dayMapping[selectedDay]}-${timeIndex + 1}`];
 
     try {
+      const token = localStorage.getItem("token");
       const response = await axios.post("http://localhost:5000/api/desk/add", {
         tableId: seatId,
         reservation: reservationsToAdd,
+      }, {
+        headers: { Authorization: `Bearer ${token}` },
       });
 
       if (response.data.success) {
