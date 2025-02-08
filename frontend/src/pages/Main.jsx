@@ -25,7 +25,7 @@ export default function MainPage({ setIsAuthenticated }) {
         <Link to="/reservation" className="btn btn-success btn-lg">자리 예약</Link>
       </div>
 
-      {isAdmin && <Link to="/admin" className="text-muted small">관리자 페이지</Link>}
+      {isAdmin && <Link to="/admin-main" className="text-muted small">관리자 페이지</Link>}
 
       <button onClick={handleLogout} className="text-muted small border-0 bg-transparent">
         로그아웃

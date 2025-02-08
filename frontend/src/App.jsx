@@ -5,7 +5,8 @@ import LoginPage from "./pages/Login";
 import MainPage from "./pages/Main";
 import RentalPage from "./pages/Rental";  // 물품 대여 페이지
 import ReservationPage from "./pages/Reservation";  // 자리 예약 페이지
-import AdminPage from "./pages/Admin";  // 관리자 페이지
+import AdminPage from "./pages/AdminMain";  // 관리자 페이지
+import ManageMembers from "./pages/ManageMembers";
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -32,9 +33,14 @@ export default function App() {
           element={isAuthenticated ? <ReservationPage /> : <Navigate to="/" />}
         />
         <Route
-          path="/admin"
+          path="/admin-main"  
           element={isAuthenticated ? <AdminPage /> : <Navigate to="/" />}
         />
+        <Route
+          path="/manage-members"  // ✅ 추가
+          element={isAuthenticated ? <ManageMembers /> : <Navigate to="/" />}
+        />
+        
       </Routes>
     
     
