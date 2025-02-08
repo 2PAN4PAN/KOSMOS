@@ -13,113 +13,141 @@ const seats = [
   { id: 4, name: "모니터 자리 3" },
 ];
 
-const times = Array.from({ length: 16 }, (_, i) => `${String(i + 8).padStart(2, "0")}:00`);
-const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const times = Array.from({ length: 16 }, (_, i) => `${String(i + 8).padStart(2, "0")}:00`); // "08:00" ~ "23:00"
+const days = ["월", "화", "수", "목", "금", "토", "일"];
+
+const dayMapping = {
+  "월": "Monday",
+  "화": "Tuesday", 
+  "수": "Wednesday", 
+  "목": "Thursday", 
+  "금": "Friday", 
+  "토": "Saturday", 
+  "일": "Sunday"
+};
+
+const getTodayDay = () => {
+  const todayIndex = new Date().getDay(); // 0(일) ~ 6(토)
+  return days[todayIndex === 0 ? 6 : todayIndex - 1]; // 일요일(0)은 배열의 마지막(6)으로 설정
+};
 
 export default function Reservation() {
   const [reservations, setReservations] = useState({});
   const [names, setNames] = useState({});
-  const [selectedDay, setSelectedDay] = useState("Monday");
-  const [selectedSeatId, setSelectedSeatId] = useState(1); // 기본값은 첫 번째 자리
+  const [selectedDay, setSelectedDay] = useState(getTodayDay());
+  const [reservationStatus, setReservationStatus] = useState({});
 
-  // **1️⃣ 예약 현황 가져오기 (백엔드 연동)**
   useEffect(() => {
-    axios.get('http://localhost:5000/api/book/desk') // 책상 목록 가져오기
-      .then(response => {
-        // 책상 목록을 처리하는 로직
-      })
-      .catch(error => console.error("책상 데이터 불러오기 실패:", error));
-
-    // 예약 현황 가져오기
-    seats.forEach((seat) => {
-      axios.get(`http://localhost:5000/api/book/desk/${seat.id}`)
-        .then((response) => {
-          // 예약 현황을 상태에 반영
-          response.data.forEach((reservation) => {
-            const key = `${seat.id}-${reservation.day}-${reservation.time}`;
-            setReservations(prev => ({ ...prev, [key]: true }));
-            setNames(prev => ({ ...prev, [key]: reservation.name }));
+    const fetchReservationStatus = async (seatId) => {
+      try {
+        const response = await axios.get(`http://localhost:5000/api/desk/${seatId}`);
+        if (response.data.success) {
+          const status = response.data.reservationStatus;
+          console.log('Fetched Status:', status);
+          
+          // 요일과 시간 인덱스 변환
+          const convertedStatus = {};
+          Object.keys(status).forEach(day => {
+            convertedStatus[day] = times.map((time, index) => {
+              // 시간 인덱스를 문자열로 변환 (1부터 시작)
+              return status[day][String(index + 1)] || "사용 가능";
+            });
           });
-        })
-        .catch((error) => console.error("예약 현황 불러오기 실패:", error));
-    });
-  }, []);
 
-  // **2️⃣ 예약 요청 함수**
+          setReservationStatus((prevStatus) => ({
+            ...prevStatus,
+            [seatId]: convertedStatus,
+          }));
+        }
+      } catch (error) {
+        console.error("예약 상태를 불러오는 데 실패했습니다.", error);
+      }
+    };
+
+    // 모든 자리에 대해 예약 상태를 가져오기
+    seats.forEach((seat) => {
+      fetchReservationStatus(seat.id);
+    });
+  }, [selectedDay]);
+
   const handleReserve = (seatId, time) => {
-    const key = `${seatId}-${selectedDay}-${time}`;
+    const timeIndex = times.indexOf(time);
+    const currentStatus = reservationStatus[seatId]?.[dayMapping[selectedDay]]?.[timeIndex];
     
-    if (!reservations[key]) {
+    console.log('Current Status:', {
+      seatId, 
+      day: dayMapping[selectedDay], 
+      time, 
+      timeIndex, 
+      status: currentStatus
+    });
+
+    // 예약 가능 상태일 경우 예약을 진행
+    if (currentStatus === "사용 가능") {
       const name = prompt("예약자명을 입력하세요:");
       if (name) {
-        const reservationData = {
-          tableId: seatId.toString(),
-          reservation: [`${selectedDay}-${time}`], // 예: ["Monday-10"]
-        };
-
-        axios.post(`http://localhost:5000/api/book/desk/${seatId}`, reservationData)
-          .then((response) => {
-            if (response.data.success) {
-              setReservations((prev) => ({ ...prev, [key]: true }));
-              setNames((prev) => ({ ...prev, [key]: name }));
-              alert(response.data.message);
-            } else {
-              alert(response.data.message);
-            }
-          })
-          .catch((error) => console.error("예약 실패:", error));
+        const key = `${seatId}-${selectedDay}-${time}`;
+        
+        // 예약 상태를 업데이트
+        setReservations((prev) => ({ ...prev, [key]: true }));
+        setNames((prev) => ({ ...prev, [key]: name }));
+        addReservation(seatId, time, name); // 예약 추가 요청
       }
+    } else if (currentStatus === "예약됨") {
+      alert("이미 예약된 시간입니다.");
+    } else {
+      alert("예약 가능한 시간이 아닙니다.");
     }
   };
 
-  // **3️⃣ 예약 취소 요청 함수**
-  const handleCancel = (seatId, time) => {
-    const key = `${seatId}-${selectedDay}-${time}`;
-    
-    const cancelData = {
-      tableId: seatId.toString(),
-      reservation: [`${selectedDay}-${time}`], // 예: ["Monday-10"]
-    };
+  const addReservation = async (seatId, time, name) => {
+    const timeIndex = times.indexOf(time);
+    const reservationKey = `${seatId}-${selectedDay}-${time}`;
+    const reservationsToAdd = [`${dayMapping[selectedDay]}-${timeIndex + 1}`];
 
-    axios.post(`http://localhost:5000/api/book/desk/dismiss/${seatId}`, cancelData)
-      .then((response) => {
-        if (response.data.success) {
-          setReservations((prev) => {
-            const newReservations = { ...prev };
-            delete newReservations[key];
-            return newReservations;
-          });
-          setNames((prev) => {
-            const newNames = { ...prev };
-            delete newNames[key];
-            return newNames;
-          });
-          alert(response.data.message);
-        } else {
-          alert(response.data.message);
-        }
-      })
-      .catch((error) => console.error("예약 취소 실패:", error));
+    try {
+      const response = await axios.post("http://localhost:5000/api/desk/add", {
+        tableId: seatId,
+        reservation: reservationsToAdd,
+      });
+
+      if (response.data.success) {
+        alert("예약이 완료되었습니다.");
+        
+        // 로컬 상태 업데이트
+        setReservationStatus((prevStatus) => {
+          const updatedStatus = { ...prevStatus };
+          if (updatedStatus[seatId] && updatedStatus[seatId][dayMapping[selectedDay]]) {
+            updatedStatus[seatId][dayMapping[selectedDay]][timeIndex] = "예약됨";
+          }
+          return updatedStatus;
+        });
+      } else {
+        alert(response.data.message);
+      }
+    } catch (error) {
+      console.error("예약 추가에 실패했습니다.", error);
+    }
   };
 
   return (
     <div className="container">
       <div className="header" style={{ textAlign: "left" }}>
-        <h1 className="title">KOSS 동아리방 자리 예약 시스템</h1>
+        <h1 className="title">Koss 동아리방 자리 예약 시스템</h1>
       </div>
       <p className="subtitle">* 모든 예약은 일주일 단위로 가능합니다.</p>
 
-      {/* 요일 선택 */}
       <div className="day-selector">
         <label>예약할 요일:</label>
         <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)}>
           {days.map((day) => (
-            <option key={day} value={day}>{day}</option>
+            <option key={day} value={day}>
+              {day}
+            </option>
           ))}
         </select>
       </div>
 
-      {/* 책상 예약 표시 */}
       <div className="grid">
         {seats.map((seat) => (
           <Card key={seat.id} className="card">
@@ -128,14 +156,26 @@ export default function Reservation() {
               <div className="time-grid">
                 {times.map((time) => {
                   const key = `${seat.id}-${selectedDay}-${time}`;
+                  const timeIndex = times.indexOf(time);
+                  const currentStatus = reservationStatus[seat.id]?.[dayMapping[selectedDay]]?.[timeIndex];
+
                   return (
-                    <Button
-                      key={time}
-                      className={`reservation-button ${reservations[key] ? "reserved" : ""}`}
-                      onClick={() => reservations[key] ? handleCancel(seat.id, time) : handleReserve(seat.id, time)}
-                    >
-                      {reservations[key] ? `${names[key]} (취소)` : time}
-                    </Button>
+                    <div key={time}>
+                      <Button
+                        className={`reservation-button ${
+                          currentStatus === "예약됨" ? "reserved" : ""
+                        }`}
+                        onClick={() => {
+                          if (currentStatus === "사용 가능") {
+                            handleReserve(seat.id, time);
+                          } else {
+                            alert("이미 예약된 시간입니다.");
+                          }
+                        }}
+                      >
+                        {names[key] || time}
+                      </Button>
+                    </div>
                   );
                 })}
               </div>
@@ -146,3 +186,4 @@ export default function Reservation() {
     </div>
   );
 }
+
