@@ -2,15 +2,8 @@
 const express = require('express');
 const router = express.Router();
 const Ware = require('../models/Ware');
-const User = require('../../auth/models/User'); // User 모델 추가
 const Log = require('../../auth/models/Log');
 const { authMiddleware, adminMiddleware } = require('../../auth/middleware/auth');
-
-// 물품 대여 페이지 (렌더링 가정)
-router.get('/ware', (req, res) => {
-    // TODO: 물품 대여 페이지 렌더링 (템플릿 엔진 사용)
-    res.send('물품 대여 페이지');
-});
 
 // 대여 가능 물품 목록 조회
 router.get('/', async (req, res) => {
