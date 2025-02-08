@@ -85,7 +85,7 @@ export default function Reservation() {
 
     // 예약 가능 상태일 경우 예약을 진행
     if (currentStatus === "사용 가능") {
-      const name = prompt("예약자명을 입력하세요:");
+      const name = localStorage.getItem("studentId");
       if (name) {
         const key = `${seatId}-${selectedDay}-${time}`;
         
