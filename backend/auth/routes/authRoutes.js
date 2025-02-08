@@ -112,6 +112,26 @@ router.post('/mod', authMiddleware, async (req, res) => {
   }
 });
 
+// 모든 사용자 목록 조회 (관리자 전용)
+router.get('/users', [authMiddleware, adminMiddleware], async (req, res) => {
+  try {
+    // 민감한 정보(비밀번호 등)를 제외하고 사용자 정보 조회
+    const users = await User.find({}).select('-password');
+    
+    res.status(200).json({
+      success: true,
+      count: users.length,
+      data: users
+    });
+  } catch (error) {
+    console.error('사용자 목록 조회 중 오류:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '사용자 목록을 불러오는 중 오류가 발생했습니다.' 
+    });
+  }
+});
+
 // User Information Retrieval Route
 router.post('/', authMiddleware, async (req, res) => {
   try {
