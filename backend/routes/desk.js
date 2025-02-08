@@ -75,4 +75,91 @@ router.get('/desk/:id', async (요청, 응답) => {
     응답.render('book.ejs', { tableId, schedule });
 });
 
+
+router.get('/desk/reserve/:id', async (요청, 응답) => {
+    const tableId = 요청.params.id;
+    
+    // 예약 정보를 가져옴
+    const schedule = await getTableReservations(tableId);
+
+    if (!schedule) {
+        return 응답.status(404).send("해당 테이블의 예약 정보가 없습니다.");
+    }
+
+    응답.render("reserve.ejs", { tableId, schedule });
+});
+  
+router.get('/desk/dismiss/:id', async (요청, 응답) => {
+    const tableId = 요청.params.id;
+    
+    // 예약 정보를 가져옴
+    const schedule = await getTableReservations(tableId);
+
+    if (!schedule) {
+        return 응답.status(404).send("해당 테이블의 예약 정보가 없습니다.");
+    }
+
+    응답.render("dismiss.ejs", { tableId, schedule });
+});
+
+router.post('/add', async (req, res) => {
+    const { tableId, reservation } = req.body;
+
+    if (!reservation) {
+        return res.status(400).send("예약할 시간을 선택해주세요.");
+    }
+
+    const db = client.db("2pan4pan");
+    const collection = db.collection("reservations");
+
+    const updateQuery = {};
+    if (Array.isArray(reservation)) {
+        reservation.forEach(slot => {
+            const [day, time] = slot.split("-");
+            updateQuery[`schedule.${day}.${time}`] = "F"; // 예약 상태 변경
+        });
+    } else {
+        const [day, time] = reservation.split("-");
+        updateQuery[`schedule.${day}.${time}`] = "F";
+    }
+
+    await collection.updateOne(
+        { tableId: parseInt(tableId) },
+        { $set: updateQuery }
+    );
+
+    res.redirect(`/api/book/desk/${tableId}`);
+});
+
+router.post('/cancel', async (req, res) => {
+    const { tableId, reservation } = req.body;
+
+    if (!reservation) {
+        return res.status(400).send("취소 할 시간을 선택해주세요.");
+    }
+
+    const db = client.db("2pan4pan");
+    const collection = db.collection("reservations");
+
+    const updateQuery = {};
+    if (Array.isArray(reservation)) {
+        reservation.forEach(slot => {
+            const [day, time] = slot.split("-");
+            updateQuery[`schedule.${day}.${time}`] = "T"; // 예약 상태 변경
+        });
+    } else {
+        const [day, time] = reservation.split("-");
+        updateQuery[`schedule.${day}.${time}`] = "T";
+    }
+
+    await collection.updateOne(
+        { tableId: parseInt(tableId) },
+        { $set: updateQuery }
+    );
+
+    res.redirect(`/api/book/desk/${tableId}`);
+});
+
+
+
 module.exports = router;
