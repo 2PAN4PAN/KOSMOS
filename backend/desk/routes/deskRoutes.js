@@ -10,7 +10,6 @@ const cron = require('node-cron');
 
 async function initializeTableReservations() {
     const tableCount = 5;
-    const currentWeekRange = getCurrentWeekRange();
 
     for (let i = 1; i <= tableCount; i++) {
         // 기존 테이블 찾기 또는 새로 생성
