@@ -224,28 +224,20 @@ router.get('/:id', async (req, res) => {
 // Get current user's desk reservation status
 router.get('/', authMiddleware, async (req, res) => {
     try {
-        // Get the current week range
-        const currentWeekRange = getCurrentWeekRange();
-
-        // Find all desk reservations for the current user in the current week
-        const userReservations = await Desk.find({
-            'schedule.reservedBy': req.user._id,
-            week: currentWeekRange
+        // Find all active desk rentals for the current user
+        const userReservations = await Log.find({
+            user: req.user._id,
+            itemModel: 'Desk',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
         });
 
         // Transform reservations into a more readable format
-        const reservationDetails = userReservations.map(desk => ({
-            tableId: desk.tableId,
-            week: desk.week,
-            reservations: Object.entries(desk.schedule).flatMap(([day, timeSlots]) => 
-                Object.entries(timeSlots)
-                    .filter(([_, slotInfo]) => slotInfo.reservedBy && slotInfo.reservedBy.toString() === req.user._id.toString())
-                    .map(([time, slotInfo]) => ({
-                        day,
-                        time,
-                        type: slotInfo.type
-                    }))
-            )
+        const reservationDetails = userReservations.map(log => ({
+            deskId: log.item,
+            rentalDate: log.rentalDate,
+            expectedReturnDate: log.expectedReturnDate,
+            status: log.status,
+            isOverdue: log.isOverdue
         }));
 
         res.json({
