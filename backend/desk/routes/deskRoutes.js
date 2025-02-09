@@ -160,7 +160,6 @@ router.post('/add', authMiddleware, async (req, res) => {
     try {
         // 시작 시간 파싱
         const startDate = new Date(reservation);
-        startDate.setHours(startDate.getHours() + 9);
 
         console.log(startDate)
         
