@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const Desk = require('../models/Desk');
 const Log = require('../../auth/models/Log');
+const User = require('../../auth/models/User'); // Import User model
 const { authMiddleware } = require('../../auth/middleware/auth');
 const cron = require('node-cron');
 
@@ -31,38 +32,20 @@ function getCurrentWeekRange() {
 
 async function initializeTableReservations() {
     const tableCount = 5;
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const timeSlots = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10","11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
-
-    // Get the current week range
     const currentWeekRange = getCurrentWeekRange();
 
     for (let i = 1; i <= tableCount; i++) {
-        // Find or update the existing table reservation for the current week
-        const existingTable = await Desk.findOne({ tableId: i, week: currentWeekRange });
+        // 기존 테이블 찾기 또는 새로 생성
+        const existingTable = await Desk.findOne({ 
+            tableId: i, 
+            week: currentWeekRange 
+        });
 
         if (!existingTable) {
-            // 예약 일정 기본값 (T: 예약 가능)
-            const schedule = {};
-            days.forEach(day => {
-                schedule[day] = {};
-                timeSlots.forEach(time => {
-                    schedule[day][time] = { type: "T" }; // Use new schema structure
-                });
+            // 새로운 테이블 예약 생성 (유연한 스케줄 구조)
+            await Desk.create({
+                tableId: i,
             });
-
-            // 테이블 예약 정보 삽입 또는 업데이트
-            await Desk.findOneAndUpdate(
-                { tableId: i },
-                {
-                    tableId: i,
-                    week: currentWeekRange,
-                    schedule: schedule
-                },
-                { upsert: true, new: true }
-            );
-
-            console.log(`✅ 테이블 ${i}번 예약 정보 업데이트됨. 주간: ${currentWeekRange}`);
         }
     }
 }
@@ -76,141 +59,7 @@ cron.schedule('0 0 * * 1', () => {
 // 서버 시작 시 한 번 실행
 initializeTableReservations();
 
-router.post('/add', authMiddleware, async (req, res) => {
-    const { tableId, reservation } = req.body;
 
-    if (!reservation || reservation.length === 0) {
-        return res.status(400).json({
-            success: false,
-            message: "예약할 시간을 선택해주세요."
-        });
-    }
-
-    const updateQuery = {};
-    const currentWeekRange = getCurrentWeekRange();
-
-    // Find the first and last time slots
-    const firstSlot = reservation[0].split('-');
-    const lastSlot = reservation[reservation.length - 1].split('-');
-    const firstDay = firstSlot[0];
-    const firstTimeSlot = firstSlot[1];
-    const lastDay = lastSlot[0];
-    const lastTimeSlot = lastSlot[1];
-
-    // Construct update query
-    reservation.forEach(slot => {
-        const [day, time] = slot.split('-');
-        updateQuery[`schedule.${day}.${time}.type`] = 'F';
-    });
-
-    // Update desk reservation
-    await Desk.findOneAndUpdate(
-        { 
-            tableId: tableId, 
-            week: currentWeekRange 
-        },
-        { $set: updateQuery }
-    );
-
-    // Create log with first and last time slot dates
-    const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-    const currentDate = new Date();
-    const firstDayIndex = days.indexOf(firstDay);
-    const lastDayIndex = days.indexOf(lastDay);
-    
-    // Calculate rental and return dates based on the day of the week
-    const rentalDate = new Date(currentDate);
-    rentalDate.setDate(currentDate.getDate() - currentDate.getDay() + firstDayIndex + 1);
-    rentalDate.setHours(parseInt(firstTimeSlot), 0, 0, 0);
-
-    const expectedReturnDate = new Date(currentDate);
-    expectedReturnDate.setDate(currentDate.getDate() - currentDate.getDay() + lastDayIndex + 1);
-    expectedReturnDate.setHours(parseInt(lastTimeSlot), 0, 0, 0);
-
-    new Log({
-        user: req.user._id,
-        item: parseInt(tableId),
-        itemModel: "Desk",
-        rentalDate: rentalDate,
-        expectedReturnDate: expectedReturnDate
-    }).save();
-
-    return res.json({
-        success: true
-    })
-});
-
-router.post('/cancel', authMiddleware, async (req, res) => {
-    const { tableId, reservation } = req.body;
-
-    if (!reservation || reservation.length === 0) {
-        return res.status(400).json({
-            success: false,
-            message: "취소할 시간을 선택해주세요."
-        });
-    }
-
-    try {
-        const updateQuery = {};
-        const currentWeekRange = getCurrentWeekRange();
-
-        // Construct update query for desk availability
-        reservation.forEach(slot => {
-            const [day, time] = slot.split('-');
-            updateQuery[`schedule.${day}.${time}.type`] = 'T';
-        });
-
-        // 1. 책상 예약 상태 업데이트
-        const updatedDesk = await Desk.findOneAndUpdate(
-            { 
-                tableId: tableId, 
-                week: currentWeekRange 
-            },
-            { $set: updateQuery },
-            { new: true }
-        );
-
-        if (!updatedDesk) {
-            return res.status(404).json({
-                success: false,
-                message: "해당 예약을 찾을 수 없습니다."
-            });
-        }
-
-        // 2. 로그 엔트리 업데이트 (반납 처리)
-        const logUpdate = await Log.findOneAndUpdate(
-            {
-                user: req.user._id,
-                item: tableId,
-                itemModel: 'Desk',
-                status: { $in: ['ACTIVE', 'OVERDUE'] }
-            },
-            {
-                actualReturnDate: new Date(),
-                status: 'RETURNED'
-            },
-            { new: true }
-        );
-
-        if (!logUpdate) {
-            console.warn(`로그 엔트리를 찾을 수 없음: 사용자 ${req.user._id}, 책상 ${tableId}`);
-        }
-
-        return res.json({
-            success: true,
-            message: "예약이 성공적으로 취소되었습니다.",
-            desk: updatedDesk,
-            log: logUpdate
-        });
-
-    } catch (error) {
-        console.error('예약 취소 중 오류 발생:', error);
-        return res.status(500).json({
-            success: false,
-            message: "예약 취소 중 서버 오류가 발생했습니다."
-        });
-    }
-});
 
 // 특정 테이블 예약 현황 조회 라우트
 router.get('/:id', async (req, res) => {
@@ -218,44 +67,43 @@ router.get('/:id', async (req, res) => {
         const tableId = parseInt(req.params.id);
         const currentWeekRange = getCurrentWeekRange();
 
-        // 현재 주의 특정 테이블 예약 정보 조회
+        // 해당 테이블의 현재 활성 및 연체 로그 조회
+        const activeLogs = await Log.find({
+            item: tableId,
+            itemModel: 'Desk',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        });
+
+        // 로그 정보 변환
+        const reservationDetails = activeLogs.map(log => ({
+            userId: log.user,
+            rentalDate: log.rentalDate,
+            expectedReturnDate: log.expectedReturnDate,
+            status: log.status
+        }));
+
+        // 테이블 기본 정보 조회 (선택적)
         const tableReservation = await Desk.findOne({ 
             tableId: tableId, 
             week: currentWeekRange 
         });
 
-        if (!tableReservation) {
-            return res.status(404).json({
-                success: false,
-                message: '해당 테이블의 예약 정보를 찾을 수 없습니다.'
-            });
-        }
-
-        // 예약 현황 가공
-        const reservationStatus = {};
-        const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-        const timeSlots = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10","11", "12", "13", "14", "15", "16", "17", "18", "19", "20"];
-
-        days.forEach(day => {
-            reservationStatus[day] = {};
-            timeSlots.forEach(time => {
-                const slotStatus = tableReservation.schedule[day][time].type;
-                reservationStatus[day][time] = slotStatus === 'F' ? '예약됨' : '사용 가능';
-            });
-        });
-
-        res.json({
+        return res.json({
             success: true,
             tableId: tableId,
-            week: tableReservation.week,
-            reservationStatus: reservationStatus
+            currentWeek: currentWeekRange,
+            activeReservations: reservationDetails,
+            tableDetails: tableReservation ? {
+                week: tableReservation.week,
+                schedule: tableReservation.schedule
+            } : null
         });
+
     } catch (error) {
         console.error('테이블 예약 현황 조회 중 오류:', error);
-        res.status(500).json({
+        return res.status(500).json({
             success: false,
-            message: '서버 오류가 발생했습니다.',
-            error: error.message
+            message: '테이블 예약 현황을 조회하는 중 오류가 발생했습니다.'
         });
     }
 });
@@ -289,6 +137,142 @@ router.get('/', authMiddleware, async (req, res) => {
             success: false, 
             message: 'Failed to retrieve desk reservations' 
         });
+    }
+});
+
+// 책상 예약 라우터
+router.post('/add', authMiddleware, async (req, res) => {
+    const { tableId, reservation } = req.body;
+
+    // 입력 유효성 검사
+    if (!tableId || !reservation) {
+        return res.status(400).json({
+            success: false,
+            message: "필수 예약 정보가 누락되었습니다."
+        });
+    }
+
+    try {
+        // 시작 시간 파싱
+        const startDate = new Date(reservation);
+        
+        // 종료 시간을 시작 시간 + 1시간으로 설정
+        const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
+
+        // 기존 활성 예약 확인
+        const existingActiveLog = await Log.findOne({
+            user: req.user._id,
+            item: tableId,
+            itemModel: 'Desk',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        });
+
+        if (existingActiveLog) {
+            return res.status(400).json({
+                success: false,
+                message: "이미 해당 책상에 대한 활성 예약이 존재합니다."
+            });
+        }
+
+        // 새 로그 생성
+        const log = new Log({
+            user: req.user._id,
+            item: tableId,
+            itemModel: 'Desk',
+            rentalDate: startDate,
+            expectedReturnDate: endDate,
+            status: 'ACTIVE'
+        });
+
+        // 로그 저장
+        await log.save();
+
+        return res.json({
+            success: true,
+            message: "책상 예약이 성공적으로 완료되었습니다.",
+            reservationId: log._id,
+            startTime: startDate,
+            endTime: endDate
+        });
+
+    } catch (error) {
+        console.error('책상 예약 중 오류:', error);
+        return res.status(500).json({
+            success: false,
+            message: "예약 처리 중 서버 오류가 발생했습니다."
+        });
+    }
+});
+
+// 책상 예약 취소 라우터
+router.post('/cancel', authMiddleware, async (req, res) => {
+    const { tableId } = req.body;
+
+    // 입력 유효성 검사
+    if (!tableId) {
+        return res.status(400).json({
+            success: false,
+            message: "취소할 책상 정보가 누락되었습니다."
+        });
+    }
+
+    try {
+        // 활성 예약 찾기
+        const log = await Log.findOne({
+            user: req.user._id,
+            item: tableId,
+            itemModel: 'Desk',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        });
+
+        if (!log) {
+            return res.status(404).json({
+                success: false,
+                message: "취소할 예약을 찾을 수 없습니다."
+            });
+        }
+
+        // 예약 취소 (반납 처리)
+        log.actualReturnDate = new Date();
+        log.status = 'RETURNED';
+        await log.save();
+
+        return res.json({
+            success: true,
+            message: "예약이 성공적으로 취소되었습니다."
+        });
+
+    } catch (error) {
+        console.error('책상 예약 취소 중 오류:', error);
+        return res.status(500).json({
+            success: false,
+            message: "예약 취소 중 서버 오류가 발생했습니다."
+        });
+    }
+});
+
+// 자동 반납 처리를 위한 크론 작업
+cron.schedule('0 * * * *', async () => {
+    const now = new Date();
+    
+    try {
+        // 만료되었지만 아직 반납되지 않은 예약 찾기
+        const overdueRentals = await Log.find({
+            itemModel: 'Desk',
+            status: { $in: ['ACTIVE', 'OVERDUE'] },
+            expectedReturnDate: { $lt: now }
+        });
+
+        // 각 만료 예약에 대해 반납 처리
+        for (const rental of overdueRentals) {
+            rental.actualReturnDate = now;
+            rental.status = 'RETURNED';
+            await rental.save();
+
+            console.log(`자동 반납 처리: 책상 ${rental.item}, 사용자 ${rental.user}`);
+        }
+    } catch (error) {
+        console.error('자동 반납 처리 중 오류:', error);
     }
 });
 
