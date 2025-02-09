@@ -59,7 +59,12 @@ export default function RentalPage() {
         alert(response.data.message);
         fetchBorrowedItems();
       })
-      .catch(error => console.error("대여 요청 중 오류 발생:", error));
+      .catch(error => {
+        if (error.response.status == 400){
+          alert(error.response.data.message)
+        }
+        console.error("대여 요청 중 오류 발생:", error)
+      });
   };
 
   const handleReturn = (wareName) => {
@@ -73,7 +78,12 @@ export default function RentalPage() {
         alert(response.data.message);
         fetchBorrowedItems();
       })
-      .catch(error => console.error("반납 요청 중 오류 발생:", error));
+      .catch(error => {
+        if (error.response.status == 400){
+          alert(error.response.data.message)
+        }
+        console.error("대여 요청 중 오류 발생:", error)
+      });
   };
 
   return (
