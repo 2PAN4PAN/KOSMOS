@@ -6,11 +6,15 @@ const User = require('../../auth/models/User'); // Import User model
 const { authMiddleware } = require('../../auth/middleware/auth');
 const cron = require('node-cron');
 
-
+const desknames = [
+    '큰 테이블 자리',
+    '모니터 자리 1',
+    '모니터 자리 2',
+    '모니터 자리 3'
+]
 
 async function initializeTableReservations() {
-    const tableCount = 5;
-    const currentWeekRange = getCurrentWeekRange();
+    const tableCount = 4;
 
     for (let i = 1; i <= tableCount; i++) {
         // 기존 테이블 찾기 또는 새로 생성
@@ -22,17 +26,11 @@ async function initializeTableReservations() {
             // 새로운 테이블 예약 생성 (유연한 스케줄 구조)
             await Desk.create({
                 tableId: i,
+                tableName: desknames[i - 1],
             });
         }
     }
 }
-
-// 매주 월요일 자정에 테이블 예약 초기화
-cron.schedule('0 0 * * 1', () => {
-    console.log('매주 월요일 테이블 예약 초기화 시작');
-    initializeTableReservations();
-});
-
 // 서버 시작 시 한 번 실행
 initializeTableReservations();
 
@@ -115,13 +113,21 @@ router.get('/', authMiddleware, async (req, res) => {
             status: { $in: ['ACTIVE', 'OVERDUE'] }
         });
 
+        
         // Transform reservations into a more readable format
-        const reservationDetails = userReservations.map(log => ({
-            deskId: log.item,
-            rentalDate: log.rentalDate,
-            expectedReturnDate: log.expectedReturnDate,
-            status: log.status,
-            isOverdue: log.isOverdue
+        const reservationDetails = await Promise.all(userReservations.map(async (log) => {
+            const desk_ = await Desk.findOne({
+                tableId:log.item
+            });
+
+            return {
+                deskId: log.item,
+                deskName: desk_.tableName,
+                rentalDate: log.rentalDate,
+                expectedReturnDate: log.expectedReturnDate,
+                status: log.status,
+                isOverdue: log.isOverdue
+            }
         }));
 
         res.json({
@@ -149,9 +155,14 @@ router.post('/add', authMiddleware, async (req, res) => {
         });
     }
 
+    console.log(reservation)
+
     try {
         // 시작 시간 파싱
         const startDate = new Date(reservation);
+        startDate.setHours(startDate.getHours() + 9);
+
+        console.log(startDate)
         
         // 종료 시간을 시작 시간 + 1시간으로 설정
         const endDate = new Date(startDate.getTime() + 60 * 60 * 1000);
@@ -161,6 +172,7 @@ router.post('/add', authMiddleware, async (req, res) => {
             user: req.user._id,
             item: tableId,
             itemModel: 'Desk',
+            rentalDate: startDate,
             status: { $in: ['ACTIVE', 'OVERDUE'] }
         });
 
@@ -203,22 +215,25 @@ router.post('/add', authMiddleware, async (req, res) => {
 
 // 책상 예약 취소 라우터
 router.post('/cancel', authMiddleware, async (req, res) => {
-    const { tableId } = req.body;
+    const { tableId, reservation } = req.body;
 
     // 입력 유효성 검사
-    if (!tableId) {
+    if (!tableId || !reservation) {
         return res.status(400).json({
             success: false,
-            message: "취소할 책상 정보가 누락되었습니다."
+            message: "취소할 책상 정보 또는 예약 날짜가 누락되었습니다."
         });
     }
 
     try {
-        // 활성 예약 찾기
+        // 정확한 날짜와 시간으로 예약 찾기
+        const reservationDate = new Date(reservation);
+        
         const log = await Log.findOne({
             user: req.user._id,
             item: tableId,
             itemModel: 'Desk',
+            rentalDate: reservationDate, // 정확한 날짜와 시간 일치
             status: { $in: ['ACTIVE', 'OVERDUE'] }
         });
 
