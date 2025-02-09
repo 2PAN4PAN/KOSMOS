@@ -14,7 +14,7 @@ export default function RentalPage() {
       return;
     }
 
-    axios.get('http://localhost:5000/api/auth/', {
+    axios.post('http://localhost:5000/api/auth/', {}, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(response => {
@@ -81,7 +81,7 @@ export default function RentalPage() {
       <ul>
         {availableItems.map((item, index) => (
           <li key={index}>
-            {item.wareName}
+            {item.name}
             <button onClick={() => handleBorrow(item.wareName)}>대여</button>
           </li>
         ))}
