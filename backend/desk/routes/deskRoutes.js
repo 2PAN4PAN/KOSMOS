@@ -6,29 +6,7 @@ const User = require('../../auth/models/User'); // Import User model
 const { authMiddleware } = require('../../auth/middleware/auth');
 const cron = require('node-cron');
 
-// Function to get the current week range
-function getCurrentWeekRange() {
-    const today = new Date();
-    const currentDay = today.getDay(); // 0 (Sunday) to 6 (Saturday)
-    
-    // Calculate the start of the week (Monday)
-    const monday = new Date(today);
-    monday.setDate(today.getDate() - currentDay + (currentDay === 0 ? -6 : 1));
-    
-    // Calculate the end of the week (Sunday)
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    
-    // Format the date range
-    const formatDate = (date) => {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}-${month}-${day}`;
-    };
-    
-    return `${formatDate(monday)} ~ ${formatDate(sunday)}`;
-}
+
 
 async function initializeTableReservations() {
     const tableCount = 5;
@@ -38,7 +16,6 @@ async function initializeTableReservations() {
         // 기존 테이블 찾기 또는 새로 생성
         const existingTable = await Desk.findOne({ 
             tableId: i, 
-            week: currentWeekRange 
         });
 
         if (!existingTable) {
@@ -65,37 +42,57 @@ initializeTableReservations();
 router.get('/:id', async (req, res) => {
     try {
         const tableId = parseInt(req.params.id);
-        const currentWeekRange = getCurrentWeekRange();
+        
+        // 다음 주 날짜 범위 계산
+        const today = new Date();
+        const nextWeekStart = new Date(today);
+        nextWeekStart.setDate(today.getDate() + (7 - today.getDay() + 1));
+        nextWeekStart.setHours(0, 0, 0, 0);
+        
+        const nextWeekEnd = new Date(nextWeekStart);
+        nextWeekEnd.setDate(nextWeekStart.getDate() + 6);
+        nextWeekEnd.setHours(23, 59, 59, 999);
 
-        // 해당 테이블의 현재 활성 및 연체 로그 조회
+        // 해당 테이블의 다음 주 활성 및 연체 로그 조회
         const activeLogs = await Log.find({
             item: tableId,
             itemModel: 'Desk',
+            rentalDate: { 
+                $gte: nextWeekStart, 
+                $lte: nextWeekEnd 
+            },
             status: { $in: ['ACTIVE', 'OVERDUE'] }
         });
 
+        // 로그의 사용자 정보 조회
+        const userIds = activeLogs.map(log => log.user);
+        const users = await User.find({ _id: { $in: userIds } });
+
         // 로그 정보 변환
-        const reservationDetails = activeLogs.map(log => ({
-            userId: log.user,
-            rentalDate: log.rentalDate,
-            expectedReturnDate: log.expectedReturnDate,
-            status: log.status
-        }));
+        const reservationDetails = activeLogs.map(log => {
+            const user = users.find(u => u._id.equals(log.user));
+            return {
+                userId: log.user,
+                userName: user ? user.name : '알 수 없는 사용자',
+                email: user ? user.email : '',
+                rentalDate: log.rentalDate,
+                expectedReturnDate: log.expectedReturnDate
+            };
+        });
 
         // 테이블 기본 정보 조회 (선택적)
         const tableReservation = await Desk.findOne({ 
-            tableId: tableId, 
-            week: currentWeekRange 
+            tableId: tableId
         });
 
         return res.json({
             success: true,
             tableId: tableId,
-            currentWeek: currentWeekRange,
+            currentWeek: `${nextWeekStart.toISOString().split('T')[0]} ~ ${nextWeekEnd.toISOString().split('T')[0]}`,
             activeReservations: reservationDetails,
             tableDetails: tableReservation ? {
                 week: tableReservation.week,
-                schedule: tableReservation.schedule
+                tableId: tableReservation.tableId
             } : null
         });
 
