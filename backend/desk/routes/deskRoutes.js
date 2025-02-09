@@ -221,4 +221,44 @@ router.get('/:id', async (req, res) => {
     }
 });
 
+// Get current user's desk reservation status
+router.get('/', authMiddleware, async (req, res) => {
+    try {
+        // Get the current week range
+        const currentWeekRange = getCurrentWeekRange();
+
+        // Find all desk reservations for the current user in the current week
+        const userReservations = await Desk.find({
+            'schedule.reservedBy': req.user._id,
+            week: currentWeekRange
+        });
+
+        // Transform reservations into a more readable format
+        const reservationDetails = userReservations.map(desk => ({
+            tableId: desk.tableId,
+            week: desk.week,
+            reservations: Object.entries(desk.schedule).flatMap(([day, timeSlots]) => 
+                Object.entries(timeSlots)
+                    .filter(([_, slotInfo]) => slotInfo.reservedBy && slotInfo.reservedBy.toString() === req.user._id.toString())
+                    .map(([time, slotInfo]) => ({
+                        day,
+                        time,
+                        type: slotInfo.type
+                    }))
+            )
+        }));
+
+        res.json({
+            success: true,
+            reservations: reservationDetails
+        });
+    } catch (error) {
+        console.error('Error fetching user desk reservations:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Failed to retrieve desk reservations' 
+        });
+    }
+});
+
 module.exports = router;
