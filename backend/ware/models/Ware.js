@@ -5,7 +5,6 @@ const AutoIncrement = require('mongoose-sequence')(mongoose);
 const wareSchema = new mongoose.Schema({
     _id: {
         type: Number,
-        required: true
     },
     name: {
         type: String,
@@ -26,13 +25,14 @@ const wareSchema = new mongoose.Schema({
         default: true, // 기본적으로 대여 가능
     }
 }, { 
-    _id: false, // Disable default _id generation
+    _id: false // Disable default _id generation
 });
 
 // Add auto-increment plugin
 wareSchema.plugin(AutoIncrement, { 
     id: 'ware_counter', // Unique identifier for this counter
-    inc_field: '_id' // The field to increment
+    inc_field: '_id', // The field to increment
+    start_seq: 1 // Start sequence from 1
 });
 
 const Ware = mongoose.model('Ware', wareSchema);
