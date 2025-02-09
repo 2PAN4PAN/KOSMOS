@@ -9,6 +9,7 @@ export default function ManageMembers() {
   const token = localStorage.getItem("token");
 
   const [studentId, setStudentId] = useState("");
+  const [name, setName] = useState("");
   const [password, setPassword] = useState("");
   const [isUserAdmin, setIsUserAdmin] = useState(false);
   const [message, setMessage] = useState("");
@@ -40,7 +41,7 @@ export default function ManageMembers() {
     try {
       const response = await axios.post(
         "http://localhost:5000/api/auth/add",
-        { studentId, password, isAdmin: isUserAdmin },
+        { studentId,name, password, isAdmin: isUserAdmin },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -59,11 +60,12 @@ export default function ManageMembers() {
   // 회원 삭제 요청
   const handleDeleteMember = async (id) => {
     try {
-      const response = await axios.delete("http://localhost:5000/api/auth/delete", {
-        headers: { Authorization: `Bearer ${token}` },
-        data: { studentId: id },
-      });
-      
+      const response = await axios.post(
+        "http://localhost:5000/api/auth/delete",
+        { studentId: id },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
       setMessage(response.data.message);
       if (response.data.success) {
         fetchMembers();
@@ -88,6 +90,15 @@ export default function ManageMembers() {
             className="form-control"
             value={studentId}
             onChange={(e) => setStudentId(e.target.value)}
+          />
+        </div>
+        <div className="mb-2">
+          <label className="form-label">이름</label>
+          <input
+            type="text"
+            className="form-control"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
           />
         </div>
         <div className="mb-2">
