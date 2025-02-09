@@ -4,8 +4,7 @@ import "bootstrap/dist/css/bootstrap.min.css";
 
 export default function RentalPage() {
   const [availableItems, setAvailableItems] = useState([]);
-  const [borrowedItems, setBorrowedItems] = useState([]);
-  const [user, setUser] = useState(null);
+  const [borrowedItems, setBorrowedItems] = useState([]); // 초기값을 빈 배열로 설정
   const [returnDate, setReturnDate] = useState("");
 
   useEffect(() => {
@@ -19,26 +18,35 @@ export default function RentalPage() {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(response => {
-        setUser(response.data.user);
-        fetchBorrowedItems();
+        fetchBorrowedItems(token); // 토큰을 넘겨서 대여한 물품을 가져옵니다.
       })
       .catch(error => console.error("사용자 정보를 가져오는 중 오류 발생:", error));
 
     axios.get("http://localhost:5000/api/ware")
       .then(response => {
-        // 객체 형태로 온 데이터를 배열로 변환
         const itemsArray = Object.values(response.data);
         setAvailableItems(itemsArray);
       })
       .catch(error => console.error("물품 목록을 가져오는 중 오류 발생:", error));
   }, []);
 
-  const fetchBorrowedItems = () => {
-    const token = localStorage.getItem("token");
+  const fetchBorrowedItems = (token) => {
     axios.get("http://localhost:5000/api/ware/borrowed", {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(response => setBorrowedItems(response.data))
+      .then(response => {
+        if (response.data.success) {
+          const borrowedItems = response.data.reservations;
+
+          // 서버에서 반환된 데이터 구조에 맞춰서 필요한 데이터만 추출하여 상태에 업데이트
+          const filteredItems = borrowedItems.map(item => ({
+            name: item.name, // 물품 이름
+            expectedReturnDate: item.expectedReturnDate.split("T")[0], // 예상 반납 날짜
+          }));
+
+          setBorrowedItems(filteredItems); // 대여 목록 상태 업데이트
+        }
+      })
       .catch(error => console.error("대여 현황을 가져오는 중 오류 발생:", error));
   };
 
@@ -49,7 +57,7 @@ export default function RentalPage() {
       return;
     }
 
-    axios.post("http://localhost:5000/api/ware/borrow", {
+    axios.post("http://localhost:5000/api/books/borrow", {
       wareName: wareName,
       returnDate: returnDate
     }, {
@@ -57,32 +65,29 @@ export default function RentalPage() {
     })
       .then(response => {
         alert(response.data.message);
-        fetchBorrowedItems();
+        fetchBorrowedItems(token); // 대여 후 다시 대여 목록 갱신
       })
-      .catch(error => {
-        if (error.response.status == 400){
-          alert(error.response.data.message)
-        }
-        console.error("대여 요청 중 오류 발생:", error)
-      });
+      .catch(error => console.error("대여 요청 중 오류 발생:", error));
   };
 
   const handleReturn = (wareName) => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    axios.post("http://localhost:5000/api/ware/return", { wareName }, {
+    axios.post("http://localhost:5000/api/books/return", { wareName }, {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(response => {
-        alert(response.data.message);
-        fetchBorrowedItems();
+        if (response.data.success) {
+          alert(response.data.message); // '물품 반납 성공' 메시지 처리
+          fetchBorrowedItems(token); // 반납 후 대여 목록 갱신
+        } else {
+          alert("반납 처리에 실패했습니다.");
+        }
       })
       .catch(error => {
-        if (error.response.status == 400){
-          alert(error.response.data.message)
-        }
-        console.error("대여 요청 중 오류 발생:", error)
+        alert("반납 요청 중 오류 발생.");
+        console.error("반납 요청 중 오류 발생:", error);
       });
   };
 
@@ -136,17 +141,23 @@ export default function RentalPage() {
           </tr>
         </thead>
         <tbody>
-          {borrowedItems.map((item, index) => (
-            <tr key={index}>
-              <td>{item.item.name}</td>
-              <td>{item.expectedReturnDate.split("T")[0]}</td>
-              <td>
-                <button className="btn btn-danger btn-sm" onClick={() => handleReturn(item.item.name)}>
-                  반납
-                </button>
-              </td>
+          {borrowedItems.length === 0 ? (
+            <tr>
+              <td colSpan="3" className="text-center">대여한 물품이 없습니다.</td>
             </tr>
-          ))}
+          ) : (
+            borrowedItems.map((item, index) => (
+              <tr key={index}>
+                <td>{item.name}</td>
+                <td>{item.expectedReturnDate}</td>
+                <td>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleReturn(item.name)}>
+                    반납
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
       </table>
     </div>
