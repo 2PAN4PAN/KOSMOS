@@ -9,7 +9,7 @@ const LogSchema = new mongoose.Schema({
   },
   // Details of the rented item
   item: {
-    type: mongoose.Schema.Types.ObjectId,
+    type: Number,
     refPath: 'Ware', // Dynamic reference to different item types
     required: true
   },
