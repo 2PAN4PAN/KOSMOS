@@ -7,53 +7,14 @@ import './Admin.css';
 
 
 export default function AdminPage() {
+  const token = localStorage.getItem("token");
   // 복지물품 사용현황 데이터 상태 관리
   const [items, setItems] = useState([
     { num: '20243000', name: '홍길동', item: '우산', quantity: 1, returnDate: '2025-02-14', overdueCount: 1 }
   ]);
 
   // 남은 물품 데이터 (책 33개, 우산, 충전기)
-  const [remainingItems, setRemainingItems] = useState([
-    { item: '우산', quantity: 5 },
-    { item: 'C 타입 레노버 충전기', quantity: 3 },
-    { item: 'C 타입 허브', quantity: 3 },
-    { item: 'USB 허브', quantity: 3 },
-    ...[
-      '뇌를 자극하는 C++ STL',
-      '거침없이 배우는 라즈베리 파이',
-      '컴퓨팅 사고력을 키우는 이산수학',
-      '친절한 SQL 튜닝',
-      '레트로의 유니티 게임 프로그래밍 에센스',
-      '스튜어트 미적분학',
-      '자바의 정석 1',
-      '자바의 정석 2',
-      'NGINX 쿡북',
-      '텐서플로 라이트를 활용한 안드로이드 딥러닝',
-      'elementary linear algebra',
-      '안드로이드 스튜디오를 활용한 실전 앱 만들기',
-      '미분적분학 2 다변수 함수와 벡터 해석',
-      '실전 ! 텐서플로2를 활용한 딥러닝 컴퓨터 비전',
-      'NGINX HTTP SERVER',
-      'Do IT! 안드로이드 앱 프로그래밍',
-      '최신선형대수',
-      'SQL 전문가 가이드',
-      '컴퓨터 구조 및 설계',
-      '윤성우의 열혈 자료구조',
-      '정보처리기사 실기 1',
-      '정보처리기사 실기 2',
-      '초보자를 위한 JavaScript 200제',
-      '백견불여일타 파이어베이스',
-      '초보자를 위한 Node.js 200제',
-      '스프링으로 하는 마이크로서비스 구축',
-      'Operating System Concepts',
-      '자연과학 / 공학계열 글쓰기',
-      '글쓰기 이공계열',
-      '알기 쉬운 선형대수 제12판',
-      '응용이 보이는 선형대수학:파이선과 함께하는 선형대수학 이론과 응용',
-      '4차 산업혁명 시대의 이산수학',
-      '통계학개론 (제5개정판)',
-    ].map(item => ({ item, quantity: 1 }))
-  ]);
+  const [remainingItems, setRemainingItems] = useState([]);
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -61,21 +22,49 @@ export default function AdminPage() {
     quantity: 0,
   });
 
+  useEffect(() => {
+    fetchItems();
+    fetchRemainingItems();
+  }, []);
+
+  const fetchItems = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/ware/all-rentals', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      console.log(response.data);
+      setItems(response.data.rentals);
+    } catch (error) {
+      console.error('복지물품 사용현황 데이터를 불러오는 중 오류:', error);
+    }
+  };
+
+  const fetchRemainingItems = async () => {
+    try {
+      const response = await axios.get('http://localhost:5000/api/ware/quantities');
+      setRemainingItems(Object.entries(response.data)); 
+    } catch (error) {
+      console.error('남은 물품 데이터를 불러오는 중 오류:', error);
+    }
+  };
+
   // 물품 등록 함수
   const handleItemSubmit = async () => {
-    if (!newItem.name || !newItem.description || !newItem.quantity) {
+    if (!newItem.name || !newItem.quantity) {
       alert("모든 항목을 입력하세요.");
       return;
     }
 
     const requestData = {
       name: newItem.name,
-      description: newItem.description,
+      description: "",
       quantity: newItem.quantity,
     };
 
     try {
-      const response = await axios.post('http://localhost:5000/api/books/register', requestData);
+      const response = await axios.post('http://localhost:5000/api/ware/register', requestData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
       if (response.data.message === '물품 등록 성공') {
         alert('물품 등록이 완료되었습니다!');
@@ -106,9 +95,9 @@ export default function AdminPage() {
         <tbody>
           {items.map((item, index) => (
             <tr key={index}>
-              <td>{item.num}</td>
-              <td>{item.item}</td>
-              <td>{item.returnDate}</td>
+              <td>{item.userStudentId}</td>
+              <td>{item.wareName}</td>
+              <td>{item.expectedReturnDate}</td>
             </tr>
           ))}
         </tbody>
@@ -125,8 +114,8 @@ export default function AdminPage() {
         <tbody>
           {remainingItems.map((item, index) => (
             <tr key={index}>
-              <td>{item.item}</td>
-              <td>{item.quantity}</td>
+              <td>{item[0]}</td>
+              <td>{item[1]}</td>
             </tr>
           ))}
         </tbody>
