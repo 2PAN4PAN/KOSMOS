@@ -73,3 +73,6 @@ KOSMOS는 동아리명 KOSS와 “질서 있는 체계”를 의미하는 COSMOS
 | **대여 물품 목록 조회** | /api/ware/borrowed | GET |  |  |  | orrowedItems  await Log.find({         user: req.user.\_id,         status: { $in: \['ACTIVE', 'OVERDUE'\] }       }  |
 
 ### 프론트엔드
+
+# 시연 영상
+![video for prototype](KakaoTalk_20250209_232913573.mp4)
