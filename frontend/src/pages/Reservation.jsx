@@ -44,7 +44,6 @@ export default function Reservation() {
         if (response.data.success) {
           const status = response.data.reservationStatus;
           
-          // 요일과 시간 인덱스 변환
           const convertedStatus = {};
           Object.keys(status).forEach(day => {
             convertedStatus[day] = times.map((time, index) => {
@@ -62,12 +61,10 @@ export default function Reservation() {
       }
     };
 
-    // 모든 자리에 대해 예약 상태를 가져오기
     seats.forEach((seat) => {
       fetchReservationStatus(seat.id);
     });
 
-    // 로그인된 사용자의 예약 현황 가져오기
     const fetchMyReservations = async () => {
       const token = localStorage.getItem("token");
       try {
@@ -78,17 +75,15 @@ export default function Reservation() {
           const updatedReservations = response.data.reservations.map(reservation => {
             const seat = seats.find(seat => seat.id === reservation.deskId);
 
-            // 날짜와 시간을 원하는 형식으로 변환
             const rentalDate = new Date(reservation.rentalDate);
-            const formattedDate = rentalDate.toISOString().split("T")[0]; // YYYY-MM-DD 형식으로 변환
-            const formattedTime = `${String(rentalDate.getHours()).padStart(2, "0")}:${String(rentalDate.getMinutes()).padStart(2, "0")}`; // HH:mm 형식
+            const formattedDate = rentalDate.toISOString().split("T")[0]; 
+            const formattedTime = `${String(rentalDate.getHours()).padStart(2, "0")}:${String(rentalDate.getMinutes()).padStart(2, "0")}`;
 
-            // 예약된 날짜와 시간을 포함한 객체 반환
             return {
               id: reservation.id,
               seatName: seat ? seat.name : "알 수 없음",
               time: formattedTime,
-              day: formattedDate, // 예약된 날짜 추가
+              day: formattedDate,
             };
           });
           setMyReservations(updatedReservations);
@@ -99,7 +94,6 @@ export default function Reservation() {
     };
 
     fetchMyReservations();
-
   }, [selectedDay]);
 
   const handleReserve = (seatId, time) => {
@@ -111,43 +105,53 @@ export default function Reservation() {
       if (name) {
         const key = `${seatId}-${selectedDay}-${time}`;
         
-        // 예약 상태를 업데이트
         setReservations((prev) => ({ ...prev, [key]: true }));
         setNames((prev) => ({ ...prev, [key]: name }));
-        addReservation(seatId, time, name); // 예약 추가 요청
+        addReservation(seatId, time, name); 
       }
-    } else if (currentStatus === "예약됨") {
-      alert("이미 예약된 시간입니다.");
     } else {
-      alert("예약 가능한 시간이 아닙니다.");
+      alert("예약할 수 없는 시간입니다.");
     }
   };
 
   const addReservation = async (seatId, time, name) => {
-    const timeIndex = times.indexOf(time);
+    const timeIndex = times.indexOf(time); // 시간 인덱스
     const reservationKey = `${seatId}-${selectedDay}-${time}`;
-    const reservationsToAdd = [`${dayMapping[selectedDay]}-${timeIndex + 1}`];
-
+    const dayString = dayMapping[selectedDay]; // 선택한 요일을 영어로 변환
+  
+    // 예약할 시간에 해당하는 요일과 시간을 결합한 배열을 생성
+    const reservationsToAdd = [`${dayString}-${timeIndex + 1}`]; // 예약 상태를 나타낼 키 값
+  
     try {
       const token = localStorage.getItem("token");
       const response = await axios.post("http://localhost:5000/api/desk/add", {
         tableId: seatId,
-        reservation: reservationsToAdd,
+        reservation: reservationsToAdd,  // 예약 형식에 맞게 수정
       }, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
+  
       if (response.data.success) {
         alert("예약이 완료되었습니다.");
-        
-        // 로컬 상태 업데이트
+  
+        // 예약 현황 업데이트
         setReservationStatus((prevStatus) => {
           const updatedStatus = { ...prevStatus };
-          if (updatedStatus[seatId] && updatedStatus[seatId][dayMapping[selectedDay]]) {
-            updatedStatus[seatId][dayMapping[selectedDay]][timeIndex] = "예약됨";
+          if (updatedStatus[seatId] && updatedStatus[seatId][dayString]) {
+            updatedStatus[seatId][dayString][timeIndex] = "예약됨";
           }
           return updatedStatus;
         });
+  
+        // 내 예약 현황 업데이트
+        setMyReservations((prevReservations) => [
+          ...prevReservations,
+          {
+            seatName: seats.find(seat => seat.id === seatId).name,
+            time,
+            day: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+          }
+        ]);
       } else {
         alert(response.data.message);
       }
@@ -156,21 +160,45 @@ export default function Reservation() {
     }
   };
 
-  const handleCancelReservation = (reservationId) => {
+
+  const handleCancelReservation = async (reservation) => {
     const token = localStorage.getItem("token");
-    axios.post("http://localhost:5000/api/desk/cancel", { reservationId }, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    .then(response => {
+    
+    const timeIndex = times.indexOf(reservation.time); // 예약 시간 인덱스
+    const dayString = dayMapping[reservation.day]; // 월, 화, 수 등의 요일을 영어로 변환
+  
+    // 예약 취소할 키 값 (요일-시간 인덱스)
+    const reservationToCancel = [`${dayString}-${timeIndex + 1}`];
+    
+    try {
+      const response = await axios.post("http://localhost:5000/api/desk/cancel", {
+        tableId: reservation.tableId,  // 예약 취소 시 필요한 tableId
+        reservation: reservationToCancel,  // 취소할 예약의 시간
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+  
       if (response.data.success) {
         alert("예약이 취소되었습니다.");
-        setMyReservations(prev => prev.filter(res => res.id !== reservationId));
+  
+        // 내 예약 현황에서 취소된 예약 제거
+        setMyReservations(prev => prev.filter(res => res.id !== reservation.id));
+  
+        // 예약 상태 갱신
+        setReservationStatus(prevStatus => {
+          const updatedStatus = { ...prevStatus };
+          updatedStatus[reservation.tableId][dayString][timeIndex] = "사용 가능";
+          return updatedStatus;
+        });
+      } else {
+        alert(response.data.message);
       }
-    })
-    .catch(error => {
+    } catch (error) {
       console.error("예약 취소에 실패했습니다.", error);
-    });
+    }
   };
+  
+  
 
   return (
     <div className="container">
@@ -183,9 +211,7 @@ export default function Reservation() {
         <label>예약할 요일:</label>
         <select value={selectedDay} onChange={(e) => setSelectedDay(e.target.value)}>
           {days.map((day) => (
-            <option key={day} value={day}>
-              {day}
-            </option>
+            <option key={day} value={day}>{day}</option>
           ))}
         </select>
       </div>
@@ -198,19 +224,15 @@ export default function Reservation() {
               {times.map((time) => {
                 const key = `${seat.id}-${selectedDay}-${time}`;
                 const timeIndex = times.indexOf(time);
-                const currentStatus = reservationStatus[seat.id]?.[dayMapping[selectedDay]]?.[timeIndex];
+                const currentStatus = reservationStatus[seat.id]?.[dayMapping[selectedDay]]?.[timeIndex] || "사용 가능";  // 수정된 부분
 
                 return (
                   <div key={time}>
                     <Button
-                      className={`reservation-button ${
-                        currentStatus === "예약됨" ? "reserved-time" : "available"
-                      }`}
+                      className={`reservation-button ${currentStatus === "예약됨" ? "reserved-time" : "available"}`}
                       onClick={() => {
                         if (currentStatus === "사용 가능") {
                           handleReserve(seat.id, time);
-                        } else if (currentStatus === "예약됨") {
-                          alert("이미 예약된 시간입니다.");
                         }
                       }}
                     >
@@ -223,6 +245,7 @@ export default function Reservation() {
           </div>
         ))}
       </div>
+
 
       <h2 className="my-reservations-title">내 예약 현황</h2>
       <table className="table">
@@ -243,7 +266,7 @@ export default function Reservation() {
               <td>
                 <button
                   className="btn btn-danger"
-                  onClick={() => handleCancelReservation(reservation.id)}
+                  onClick={() => handleCancelReservation(reservation)}
                 >
                   취소
                 </button>
