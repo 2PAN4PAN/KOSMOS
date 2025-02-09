@@ -47,8 +47,11 @@ router.post('/borrow', authMiddleware, async (req, res) => {
         const wareId = ware._id;  // 물품 ID 가져오기
 
         // 대여 가능 여부 확인
-        if (!ware.isAvailable || ware.quantity <= 0) {
+        if (!ware.isAvailable) {
             return res.status(400).json({ message: '대여 불가능한 물품입니다.' });
+        }
+        if (ware.quantity <= 0) {
+            return res.status(400).json({ message: '대여 가능한 물품이 없습니다.' });
         }
 
         // 대여 처리
