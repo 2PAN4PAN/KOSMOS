@@ -150,10 +150,8 @@ router.get('/borrowed', authMiddleware, async (req, res) => {
             status: { $in: ['ACTIVE', 'OVERDUE'] }
         }).populate('item');
 
-        
-
         // 대여 정보 변환
-        const reservationDetails = userReservations.map(async (log) => {
+        const reservationDetails = await Promise.all(userReservations.map(async (log) => {
             const ware = await Ware.findById(log.item);
             return {
                 wareId: log.item,
@@ -164,7 +162,9 @@ router.get('/borrowed', authMiddleware, async (req, res) => {
                 status: log.status,
                 isOverdue: log.isOverdue
             }
-        });
+        }));
+
+        console.log(reservationDetails);
 
         res.json({
             success: true,
