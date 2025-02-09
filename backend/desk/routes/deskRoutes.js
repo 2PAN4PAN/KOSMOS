@@ -150,27 +150,66 @@ router.post('/cancel', authMiddleware, async (req, res) => {
         });
     }
 
-    const updateQuery = {};
-    const currentWeekRange = getCurrentWeekRange();
+    try {
+        const updateQuery = {};
+        const currentWeekRange = getCurrentWeekRange();
 
-    // Construct update query
-    reservation.forEach(slot => {
-        const [day, time] = slot.split('-');
-        updateQuery[`schedule.${day}.${time}.type`] = 'T';
-    });
+        // Construct update query for desk availability
+        reservation.forEach(slot => {
+            const [day, time] = slot.split('-');
+            updateQuery[`schedule.${day}.${time}.type`] = 'T';
+        });
 
-    // Update desk reservation
-    await Desk.findOneAndUpdate(
-        { 
-            tableId: tableId, 
-            week: currentWeekRange 
-        },
-        { $set: updateQuery }
-    );
+        // 1. 책상 예약 상태 업데이트
+        const updatedDesk = await Desk.findOneAndUpdate(
+            { 
+                tableId: tableId, 
+                week: currentWeekRange 
+            },
+            { $set: updateQuery },
+            { new: true }
+        );
 
-    return res.json({
-        success: true
-    })
+        if (!updatedDesk) {
+            return res.status(404).json({
+                success: false,
+                message: "해당 예약을 찾을 수 없습니다."
+            });
+        }
+
+        // 2. 로그 엔트리 업데이트 (반납 처리)
+        const logUpdate = await Log.findOneAndUpdate(
+            {
+                user: req.user._id,
+                item: tableId,
+                itemModel: 'Desk',
+                status: { $in: ['ACTIVE', 'OVERDUE'] }
+            },
+            {
+                actualReturnDate: new Date(),
+                status: 'RETURNED'
+            },
+            { new: true }
+        );
+
+        if (!logUpdate) {
+            console.warn(`로그 엔트리를 찾을 수 없음: 사용자 ${req.user._id}, 책상 ${tableId}`);
+        }
+
+        return res.json({
+            success: true,
+            message: "예약이 성공적으로 취소되었습니다.",
+            desk: updatedDesk,
+            log: logUpdate
+        });
+
+    } catch (error) {
+        console.error('예약 취소 중 오류 발생:', error);
+        return res.status(500).json({
+            success: false,
+            message: "예약 취소 중 서버 오류가 발생했습니다."
+        });
+    }
 });
 
 // 특정 테이블 예약 현황 조회 라우트
