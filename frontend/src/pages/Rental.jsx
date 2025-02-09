@@ -20,7 +20,7 @@ export default function RentalPage() {
     })
       .then(response => {
         setUser(response.data.user);
-        fetchBorrowedItems();
+        fetchBorrowedItems(); // 사용자 정보 가져오면 대여 목록도 불러옵니다.
       })
       .catch(error => console.error("사용자 정보를 가져오는 중 오류 발생:", error));
 
@@ -28,7 +28,7 @@ export default function RentalPage() {
       .then(response => {
         // 객체 형태로 온 데이터를 배열로 변환
         const itemsArray = Object.values(response.data);
-        setAvailableItems(itemsArray);
+        setAvailableItems(itemsArray); // 물품 목록 설정
       })
       .catch(error => console.error("물품 목록을 가져오는 중 오류 발생:", error));
   }, []);
@@ -38,7 +38,13 @@ export default function RentalPage() {
     axios.get("http://localhost:5000/api/ware/borrowed", {
       headers: { Authorization: `Bearer ${token}` }
     })
-      .then(response => setBorrowedItems(response.data))
+      .then(response => {
+        if (response.data.success) {
+          setBorrowedItems(response.data.reservations || []); // 'reservations' 배열로 변경
+        } else {
+          console.error("대여 목록을 가져오는 데 실패했습니다.");
+        }
+      })
       .catch(error => console.error("대여 현황을 가져오는 중 오류 발생:", error));
   };
 
@@ -57,14 +63,9 @@ export default function RentalPage() {
     })
       .then(response => {
         alert(response.data.message);
-        fetchBorrowedItems();
+        fetchBorrowedItems(); // 대여 후 대여 목록 갱신
       })
-      .catch(error => {
-        if (error.response.status == 400){
-          alert(error.response.data.message)
-        }
-        console.error("대여 요청 중 오류 발생:", error)
-      });
+      .catch(error => console.error("대여 요청 중 오류 발생:", error));
   };
 
   const handleReturn = (wareName) => {
@@ -76,14 +77,9 @@ export default function RentalPage() {
     })
       .then(response => {
         alert(response.data.message);
-        fetchBorrowedItems();
+        fetchBorrowedItems(); // 반납 후 대여 목록 갱신
       })
-      .catch(error => {
-        if (error.response.status == 400){
-          alert(error.response.data.message)
-        }
-        console.error("대여 요청 중 오류 발생:", error)
-      });
+      .catch(error => console.error("반납 요청 중 오류 발생:", error));
   };
 
   return (
@@ -136,18 +132,25 @@ export default function RentalPage() {
           </tr>
         </thead>
         <tbody>
-          {borrowedItems.map((item, index) => (
-            <tr key={index}>
-              <td>{item.item.name}</td>
-              <td>{item.expectedReturnDate.split("T")[0]}</td>
-              <td>
-                <button className="btn btn-danger btn-sm" onClick={() => handleReturn(item.item.name)}>
-                  반납
-                </button>
-              </td>
+          {borrowedItems.length === 0 ? (
+            <tr>
+              <td colSpan="3" className="text-center">대여한 물품이 없습니다.</td>
             </tr>
-          ))}
+          ) : (
+            borrowedItems.map((item, index) => (
+              <tr key={index}>
+                <td>{item.wareName}</td>
+                <td>{item.expectedReturnDate ? item.expectedReturnDate.split("T")[0] : ''}</td>
+                <td>
+                  <button className="btn btn-danger btn-sm" onClick={() => handleReturn(item.wareName)}>
+                    반납
+                  </button>
+                </td>
+              </tr>
+            ))
+          )}
         </tbody>
+
       </table>
     </div>
   );
