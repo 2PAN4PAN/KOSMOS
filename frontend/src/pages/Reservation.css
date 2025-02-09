@@ -86,3 +86,13 @@
 .reserved:hover {
   background-color: #dc2626;
 }
+
+.reserved-time {
+  background-color: #d1d5db; /* 회색 */
+  color: #6b7280; /* 어두운 회색 */
+  cursor: not-allowed; /* 클릭 불가 */
+}
+
+.reserved-time:hover {
+  background-color: #d1d5db; /* 회색 그대로 */
+}

@@ -24,14 +24,14 @@ export default function AdminMain() {
 
   return (
     <div className="container mt-5 text-center">
-      <h1 className="mb-4">관리자 메인 페이지</h1>
+      <h1 className="mb-4">관리자 페이지</h1>
 
       <div className="d-grid gap-3">
         <button className="btn btn-primary" onClick={() => navigate("/admin")}>
-          관리자 페이지 이동
+          물품 관리
         </button>
         <button className="btn btn-secondary" onClick={() => navigate("/manage-members")}>
-          회원 관리 페이지 이동
+          회원 관리
         </button>
       </div>
     </div>
