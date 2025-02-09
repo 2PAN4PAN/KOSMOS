@@ -42,7 +42,7 @@ export default function RentalPage() {
     if (!token) return;
 
     axios.post('http://localhost:5000/api/ware/borrow', {
-      wareName,
+      wareName: wareName,
       returnDate: new Date().toISOString().split('T')[0]
     }, {
       headers: { Authorization: `Bearer ${token}` }
@@ -82,7 +82,7 @@ export default function RentalPage() {
         {availableItems.map((item, index) => (
           <li key={index}>
             {item.name}
-            <button onClick={() => handleBorrow(item.wareName)}>대여</button>
+            <button onClick={() => handleBorrow(item.name)}>대여</button>
           </li>
         ))}
       </ul>
@@ -91,8 +91,8 @@ export default function RentalPage() {
       <ul>
         {borrowedItems.map((item, index) => (
           <li key={index}>
-            {item.wareName} (반납 예정일: {item.returnDate})
-            <button onClick={() => handleReturn(item.wareName)}>반납</button>
+            {item.item.name} (반납 예정일: {item.expectedReturnDate.split('T')[0]})
+            <button onClick={() => handleReturn(item.item.name)}>반납</button>
           </li>
         ))}
       </ul>
