@@ -3,6 +3,7 @@ const express = require('express');
 const router = express.Router();
 const Ware = require('../models/Ware');
 const Log = require('../../auth/models/Log');
+const User = require('../../auth/models/User');
 const { authMiddleware, adminMiddleware } = require('../../auth/middleware/auth');
 
 // 대여 가능 물품 목록 조회
@@ -119,8 +120,6 @@ router.post('/return', authMiddleware, async (req, res) => {
     }
 });
 
-// routes/bookRoutes.js
-
 // 물품 별 수량 조회
 router.get('/quantities', async (req, res) => {
     try {
@@ -141,8 +140,84 @@ router.get('/quantities', async (req, res) => {
     }
 });
 
+// 사용자의 물품 대여 현황 조회
+router.get('/borrowed', authMiddleware, async (req, res) => {
+    try {
+        // 현재 사용자의 모든 활성 및 연체 물품 대여 조회
+        const userReservations = await Log.find({
+            user: req.user._id,
+            itemModel: 'Ware',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        }).populate('item');
 
-// routes/bookRoutes.js
+        // 대여 정보 변환
+        const reservationDetails = userReservations.map(log => ({
+            wareId: log.item._id,
+            wareName: log.item.name,
+            quantity: log.item.quantity,
+            rentalDate: log.rentalDate,
+            expectedReturnDate: log.expectedReturnDate,
+            status: log.status,
+            isOverdue: log.isOverdue
+        }));
+
+        res.json({
+            success: true,
+            reservations: reservationDetails
+        });
+    } catch (error) {
+        console.error('Error fetching user ware reservations:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '물품 대여 현황을 불러오는 데 실패했습니다.' 
+        });
+    }
+});
+
+// 관리자 전용: 현재 대여중인 물품 대여 기록 조회
+router.get('/all-rentals', [authMiddleware, adminMiddleware], async (req, res) => {
+    try {
+        // 현재 대여중인 물품 대여 로그 조회 (ACTIVE, OVERDUE 상태만)
+        const allRentals = await Log.find({
+            itemModel: 'Ware',
+            status: { $in: ['ACTIVE', 'OVERDUE'] }
+        })
+        .sort({ rentalDate: -1 }); // 최근 대여 순으로 정렬
+
+        // 대여 정보 변환 (사용자 정보 별도 조회)
+        const rentalDetails = await Promise.all(allRentals.map(async (log) => {
+            // 사용자 정보 조회
+            const user = await User.findById(log.user).select('name studentId');
+            const ware = await Ware.findById(log.item).select('name quantity');
+
+            return {
+                userId: log.user,
+                userName: user ? user.name : '알 수 없음',
+                userStudentId: user ? user.studentId : '알 수 없음',
+                wareId: log.item,
+                wareName: ware ? ware.name : '알 수 없음',
+                wareQuantity: ware ? ware.quantity : '알 수 없음',
+                rentalDate: log.rentalDate,
+                expectedReturnDate: log.expectedReturnDate,
+                actualReturnDate: log.actualReturnDate,
+                status: log.status,
+                isOverdue: log.isOverdue
+            };
+        }));
+
+        res.json({
+            success: true,
+            totalRentals: rentalDetails.length,
+            rentals: rentalDetails
+        });
+    } catch (error) {
+        console.error('Error fetching all ware rentals:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: '물품 대여 기록을 불러오는 데 실패했습니다.' 
+        });
+    }
+});
 
 // 관리자 대시보드용 물품 정보 조회
 router.get('/dashboard/:wareName', [authMiddleware, adminMiddleware], async (req, res) => {
@@ -188,29 +263,4 @@ router.get('/dashboard/:wareName', [authMiddleware, adminMiddleware], async (req
     }
 });
 
-// routes/bookRoutes.js
-
-// 사용자가 대여한 물품 목록 조회
-router.get('/borrowed', authMiddleware, async (req, res) => {
-    try {
-      //const userId = req.user._id; // authMiddleware를 통해 사용자 ID를 얻음
-  
-      // Log 모델에서 사용자 ID와 상태(ACTIVE, OVERDUE)를 기준으로 대여 로그 검색
-      const borrowedItems = await Log.find({
-        user: req.user._id,
-        status: { $in: ['ACTIVE', 'OVERDUE'] }
-      })
-        .populate({
-          path: 'item',
-          model: 'Ware' // 'Ware' 또는 'Desk' 모델을 동적으로 지정
-        }); // 대여 물품 정보 연결
-  
-      res.json(borrowedItems);
-    } catch (err) {
-      console.error(err);
-      res.status(500).json({ message: '서버 오류' });
-    }
-  });
-
 module.exports = router;
-
