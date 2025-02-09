@@ -84,6 +84,7 @@ export default function Reservation() {
               seatName: seat ? seat.name : "알 수 없음",
               time: formattedTime,
               day: formattedDate,
+              tableId: reservation.deskId
             };
           });
           setMyReservations(updatedReservations);
@@ -150,6 +151,7 @@ export default function Reservation() {
             seatName: seats.find(seat => seat.id === seatId).name,
             time,
             day: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+            tableId: seatId
           }
         ]);
       } else {
@@ -165,7 +167,18 @@ export default function Reservation() {
     const token = localStorage.getItem("token");
     
     const timeIndex = times.indexOf(reservation.time); // 예약 시간 인덱스
-    const dayString = dayMapping[reservation.day]; // 월, 화, 수 등의 요일을 영어로 변환
+    
+    // 날짜 문자열에서 요일 추출 (YYYY-MM-DD 형식)
+    const dayOfWeek = new Date(reservation.day).toLocaleDateString('ko-KR', { weekday: 'short' });
+    const dayString = {
+      '월': 'Monday',
+      '화': 'Tuesday', 
+      '수': 'Wednesday',
+      '목': 'Thursday',
+      '금': 'Friday',
+      '토': 'Saturday',
+      '일': 'Sunday'
+    }[dayOfWeek];
   
     // 예약 취소할 키 값 (요일-시간 인덱스)
     const reservationToCancel = [`${dayString}-${timeIndex + 1}`];
@@ -179,22 +192,35 @@ export default function Reservation() {
       });
   
       if (response.data.success) {
-        alert("예약이 취소되었습니다.");
-  
-        // 내 예약 현황에서 취소된 예약 제거
-        setMyReservations(prev => prev.filter(res => res.id !== reservation.id));
-  
-        // 예약 상태 갱신
-        setReservationStatus(prevStatus => {
+        // 예약 현황 업데이트 시 안전하게 처리
+        setReservationStatus((prevStatus) => {
           const updatedStatus = { ...prevStatus };
-          updatedStatus[reservation.tableId][dayString][timeIndex] = "사용 가능";
+          
+          // 해당 tableId가 존재하는지 확인
+          if (updatedStatus[reservation.tableId] && 
+              updatedStatus[reservation.tableId][dayString]) {
+            updatedStatus[reservation.tableId][dayString][timeIndex] = "사용 가능";
+          }
+          
           return updatedStatus;
         });
+
+        // 내 예약 목록에서 해당 예약 제거
+        setMyReservations((prevReservations) => 
+          prevReservations.filter(
+            r => !(r.tableId === reservation.tableId && 
+                   r.day === reservation.day && 
+                   r.time === reservation.time)
+          )
+        );
+
+        alert("예약이 취소되었습니다.");
       } else {
         alert(response.data.message);
       }
     } catch (error) {
       console.error("예약 취소에 실패했습니다.", error);
+      alert("예약 취소 중 오류가 발생했습니다.");
     }
   };
   
